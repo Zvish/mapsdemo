@@ -6,8 +6,7 @@
     <title>Map with File Uploads and Styling</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage.min.js"></script>
-    <script src="https://unpkg.com/leaflet-geopackage@2.0.0/dist/leaflet-geopackage.min.js"></script>
+    <script src="https://unpkg.com/leaflet-gpkg/dist/leaflet-gpkg.js"></script>
     <script src="https://unpkg.com/leaflet-kml/dist/leaflet-kml.js"></script>
     <style>
         #map { height: 600px; }
@@ -43,7 +42,7 @@
         // Function to define styles for GPKG layers
         function getStyle(feature) {
             return {
-                color: feature.properties?.color || '#3388ff', // Default color if not specified
+                color: feature.properties.color || '#3388ff', // Default color if not specified
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.5
@@ -57,41 +56,30 @@
                 const data = event.target.result;
                 let layer;
 
-                if (file.name.endsWith(".geojson")) {
+                if (file.type === "application/json" || file.name.endsWith(".geojson")) {
                     // Parse GeoJSON
-                    layer = L.geoJSON(JSON.parse(data), { style: getStyle }).addTo(map);
-                    map.fitBounds(layer.getBounds());
-                } else if (file.name.endsWith(".kml")) {
+                    layer = L.geoJSON(JSON.parse(data), {
+                        style: getStyle // Apply style to GeoJSON
+                    }).addTo(map);
+                } else if (file.type === "application/vnd.google-earth.kml+xml" || file.name.endsWith(".kml")) {
                     // Parse KML
                     layer = new L.KML(data);
-                    map.addLayer(layer);
-                    map.fitBounds(layer.getBounds());
+                    layer.addTo(map);
                 } else if (file.name.endsWith(".gpkg")) {
                     // Parse GPKG
-                    L.geoPackage.load(data).then(geoJsonData => {
-                        Object.keys(geoJsonData).forEach(layerName => {
-                            let gpkgLayer = L.geoJSON(geoJsonData[layerName], {
-                                style: getStyle,
-                                onEachFeature: function (feature, layer) {
-                                    if (feature.properties) {
-                                        let popupContent = "";
-                                        for (let key in feature.properties) {
-                                            popupContent += `<b>${key}</b>: ${feature.properties[key]}<br>`;
-                                        }
-                                        layer.bindPopup(popupContent);
-                                    }
-                                }
-                            }).addTo(map);
-                            map.fitBounds(gpkgLayer.getBounds());
+                    L.geoPackage(data).then(function(layers) {
+                        layers.forEach(function(layer) {
+                            layer.setStyle(getStyle); // Apply style to GPKG layers
+                            layer.addTo(map); // Add each layer to the map
                         });
-                    }).catch(error => {
+                    }).catch(function(error) {
                         console.error("Error loading GPKG:", error);
                     });
                 } else {
                     alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
             };
-            reader.readAsArrayBuffer(file); // Read as binary data
+            reader.readAsArrayBuffer(file); // Use readAsArrayBuffer for binary files
         }
 
         // Event listeners for the upload buttons
