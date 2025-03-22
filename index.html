@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPKG Map Example with File Uploads</title>
+    <title>Map with File Uploads</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-gpkg/dist/leaflet-gpkg.js"></script>
+    <script src="https://unpkg.com/leaflet-kml/dist/leaflet-kml.js"></script> <!-- KML support -->
     <style>
         #map { height: 600px; }
         .upload-container {
@@ -19,11 +20,11 @@
 
     <div class="upload-container">
         <h3>Upload Layers</h3>
-        <label for="designFile">Upload Design Layer (GeoJSON, KML, etc.):</label>
-        <input type="file" id="designFile" accept=".geojson,.kml" />
+        <label for="designFile">Upload Design Layer (GeoJSON, KML, GPKG):</label>
+        <input type="file" id="designFile" accept=".geojson,.kml,.gpkg" />
         <br />
-        <label for="actualFile">Upload Actual Layer (GeoJSON, KML, etc.):</label>
-        <input type="file" id="actualFile" accept=".geojson,.kml" />
+        <label for="actualFile">Upload Actual Layer (GeoJSON, KML, GPKG):</label>
+        <input type="file" id="actualFile" accept=".geojson,.kml,.gpkg" />
         <br />
         <button id="uploadDesign">Add Design Layer</button>
         <button id="uploadActual">Add Actual Layer</button>
@@ -45,22 +46,28 @@
                 let data = event.target.result;
                 let layer;
 
-                // Determine the file type and create appropriate layer
+                // Determine the file type and create an appropriate layer
                 if (file.type === "application/json" || file.name.endsWith(".geojson")) {
                     // Parse GeoJSON
                     layer = L.geoJSON(JSON.parse(data)).addTo(map);
                 } else if (file.type === "application/vnd.google-earth.kml+xml" || file.name.endsWith(".kml")) {
                     // Parse KML
-                    layer = new L.KML(data); // Use a KML parsing method to create layer
+                    layer = new L.KML(data);
                     layer.addTo(map);
+                } else if (file.name.endsWith(".gpkg")) {
+                    // Parse GPKG
+                    L.geoPackage(data).then(function(layers) {
+                        layers.forEach(function(layer) {
+                            layer.addTo(map); // Add each layer to the map
+                        });
+                    }).catch(function(error) {
+                        console.error("Error loading GPKG:", error);
+                    });
                 } else {
-                    alert('Unsupported file type. Please upload a GeoJSON or KML file.');
+                    alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
-
-                // Optionally, you can store or manage layers
-                // layers.push(layer);
             };
-            reader.readAsText(file);
+            reader.readAsArrayBuffer(file); // Use readAsArrayBuffer for binary files
         }
 
         // Event listeners for the upload buttons
