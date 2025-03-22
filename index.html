@@ -6,7 +6,7 @@
     <title>Map with File Uploads and Styling</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage.min.js"></script> <!-- Corrected GeoPackage Library -->
+    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage-browser.min.js"></script> <!-- Corrected GeoPackage Library -->
     <script src="https://unpkg.com/leaflet-kml/dist/leaflet-kml.js"></script>
     <style>
         #map { height: 600px; }
@@ -31,6 +31,9 @@
     </div>
 
     <script>
+        // Ensure GeoPackageAPI is available globally
+        let GeoPackageAPI = window.GeoPackage;
+
         // Initialize the map
         var map = L.map('map').setView([0, 0], 2);
 
@@ -54,24 +57,26 @@
             const reader = new FileReader();
             reader.onload = function(event) {
                 const arrayBuffer = event.target.result;
-                let layer;
 
                 if (file.name.endsWith(".geojson")) {
-                    // Parse GeoJSON
-                    layer = L.geoJSON(JSON.parse(arrayBuffer), { style: getStyle }).addTo(map);
+                    let layer = L.geoJSON(JSON.parse(arrayBuffer), { style: getStyle }).addTo(map);
                     map.fitBounds(layer.getBounds());
                 } else if (file.name.endsWith(".kml")) {
-                    // Parse KML
-                    layer = new L.KML(arrayBuffer);
+                    let layer = new L.KML(arrayBuffer);
                     map.addLayer(layer);
                     map.fitBounds(layer.getBounds());
                 } else if (file.name.endsWith(".gpkg")) {
-                    // Parse GPKG using GeoPackage.js API
-                    window.GeoPackageAPI.open(arrayBuffer).then(geoPackage => {
-                        return geoPackage.getFeatureTables(); // Get all feature layers
+                    if (!GeoPackageAPI || !GeoPackageAPI.open) {
+                        console.error("GeoPackageAPI is not loaded properly.");
+                        alert("Error: GeoPackage support is not available.");
+                        return;
+                    }
+
+                    GeoPackageAPI.open(arrayBuffer).then(geoPackage => {
+                        return geoPackage.getFeatureTables();
                     }).then(layerNames => {
                         layerNames.forEach(layerName => {
-                            window.GeoPackageAPI.queryForGeoJSONFeatures(geoPackage, layerName)
+                            GeoPackageAPI.queryForGeoJSONFeatures(geoPackage, layerName)
                             .then(geoJson => {
                                 let gpkgLayer = L.geoJSON(geoJson, {
                                     style: getStyle,
@@ -95,7 +100,7 @@
                     alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
             };
-            reader.readAsArrayBuffer(file); // Read as binary data
+            reader.readAsArrayBuffer(file);
         }
 
         // Event listeners for the upload buttons
