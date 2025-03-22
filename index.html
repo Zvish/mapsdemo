@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPKG Map Example</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-gpkg/dist/leaflet-gpkg.js"></script>
+    <style>
+        #map { height: 600px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([0, 0], 2); // Set initial view (latitude, longitude, zoom level)
+
+        // Add a tile layer (OpenStreetMap in this case)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Function to load GPKG file
+        function loadGpkg(url) {
+            // Use the Leaflet-GPKG plugin to read the GPKG and add layers
+            L.geoPackage(url).then(function(layers) {
+                layers.forEach(function(layer) {
+                    layer.addTo(map); // Add each layer to the map
+                });
+            }).catch(function(error) {
+                console.error("Error loading GPKG:", error);
+            });
+        }
+
+        // Load your GPKG file (ensure it's accessible)
+        loadGpkg('path/to/your/file.gpkg');
+    </script>
+</body>
+</html>
+
