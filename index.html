@@ -53,10 +53,11 @@
                     const kmlLayer = new L.KML(data);
                     kmlLayer.addTo(map);
                 } else if (file.name.endsWith(".gpkg")) {
-                    // Parse GPKG using geoPackageTileLayer
+                    // Parse GPKG
                     const gpkgLayer = L.geoPackageTileLayer(data);
                     gpkgLayer.addTo(map).catch((error) => {
                         console.error("Error adding GeoPackage layer:", error);
+                    });
                 } else {
                     alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
