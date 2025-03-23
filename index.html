@@ -14,6 +14,7 @@
     </style>
 </head>
 <body>
+
     <div id="map"></div>
 
     <div class="upload-container">
@@ -29,6 +30,28 @@
     </div>
 
     <script>
+        window.onload = function() {
+        console.log("GeoPackageAPI Loaded:", typeof GeoPackageAPI !== "undefined");
+
+        document.getElementById('uploadDesign').onclick = function() {
+            const fileInput = document.getElementById('designFile');
+            if (fileInput.files.length > 0) {
+                handleFileUpload(fileInput.files[0]);
+            } else {
+                alert('Please select a design file to upload.');
+            }
+        };
+
+        document.getElementById('uploadActual').onclick = function() {
+            const fileInput = document.getElementById('actualFile');
+            if (fileInput.files.length > 0) {
+                handleFileUpload(fileInput.files[0]);
+            } else {
+                alert('Please select an actual file to upload.');
+            }
+        };
+    };
+
         // Initialize the map
         var map = L.map('map').setView([0, 0], 2);
 
