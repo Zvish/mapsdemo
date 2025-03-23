@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map with File Uploads and GPKG Tile Layer</title>
+    <title>Map with File Uploads and GeoPackage Support</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-gpkg/dist/leaflet-gpkg.js"></script>
-    <script src="https://unpkg.com/leaflet-kml/dist/leaflet-kml.js"></script>
+    <script src="https://unpkg.com/@ngageoint/leaflet-geopackage@4.1.3/dist/leaflet-geopackage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-kml@1.0.1/L.KML.js"></script>
     <style>
         #map { height: 600px; }
         .upload-container {
@@ -40,7 +40,7 @@
         }).addTo(map);
 
         // Function to handle file uploads
-        function handleFileUpload(file, layerType) {
+        function handleFileUpload(file) {
             const reader = new FileReader();
             reader.onload = function(event) {
                 const data = event.target.result;
@@ -53,9 +53,15 @@
                     const kmlLayer = new L.KML(data);
                     kmlLayer.addTo(map);
                 } else if (file.name.endsWith(".gpkg")) {
-                    // Parse GPKG and add as tile layer
-                    const gpkgLayer = L.geoPackageTileLayer(data);
-                    gpkgLayer.addTo(map);
+                    // Parse GPKG
+                    const gpkgLayer = L.geoPackage(data);
+                    gpkgLayer.then(function(layers) {
+                        layers.forEach(function(layer) {
+                            layer.addTo(map); // Add each layer to the map
+                        });
+                    }).catch(function(error) {
+                        console.error("Error loading GPKG:", error);
+                    });
                 } else {
                     alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
@@ -67,7 +73,7 @@
         document.getElementById('uploadDesign').onclick = function() {
             const fileInput = document.getElementById('designFile');
             if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0], 'design');
+                handleFileUpload(fileInput.files[0]);
             } else {
                 alert('Please select a design file to upload.');
             }
@@ -76,7 +82,7 @@
         document.getElementById('uploadActual').onclick = function() {
             const fileInput = document.getElementById('actualFile');
             if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0], 'actual');
+                handleFileUpload(fileInput.files[0]);
             } else {
                 alert('Please select an actual file to upload.');
             }
