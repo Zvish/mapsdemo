@@ -6,18 +6,10 @@
     <title>Map with File Uploads and Styling</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage-browser.min.js"></script>
-    <script>
-    setTimeout(() => {
-        console.log("GeoPackageAPI Loaded:", window.GeoPackage);
-    }, 1000);
-    </script>
-    <script src="https://unpkg.com/leaflet-kml/dist/leaflet-kml.js"></script>
+    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage-browser.min.js"></script> <!-- Correct GPKG Library -->
     <style>
         #map { height: 600px; }
-        .upload-container {
-            margin: 10px 0;
-        }
+        .upload-container { margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -36,9 +28,6 @@
     </div>
 
     <script>
-        // Ensure GeoPackageAPI is available globally
-        let GeoPackageAPI = window.GeoPackage;
-
         // Initialize the map
         var map = L.map('map').setView([0, 0], 2);
 
@@ -50,7 +39,7 @@
         // Function to define styles for GPKG layers
         function getStyle(feature) {
             return {
-                color: feature.properties?.color || '#3388ff', // Default color if not specified
+                color: feature.properties.color || '#3388ff', // Default color if not specified
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.5
@@ -58,77 +47,88 @@
         }
 
         // Function to handle file uploads
-    function handleFileUpload(file, layerType) {
-    const reader = new FileReader();
+        function handleFileUpload(file) {
+            const reader = new FileReader();
 
-    reader.onload = function(event) {
-        const arrayBuffer = event.target.result;
+            reader.onload = async function(event) {
+                const arrayBuffer = event.target.result;
 
-        if (file.name.endsWith(".gpkg")) {
-            GeoPackageAPI.open(arrayBuffer).then(geoPackage => {
-                return geoPackage.getFeatureTables();
-            }).then(layerNames => {
-                if (layerNames.length === 0) {
-                    alert("No vector layers found in the GeoPackage.");
-                    return;
-                }
+                if (file.name.endsWith(".gpkg")) {
+                    if (typeof GeoPackageAPI === "undefined" || !GeoPackageAPI.open) {
+                        console.error("GeoPackageAPI is not loaded properly.");
+                        alert("Error: GeoPackage support is not available.");
+                        return;
+                    }
 
-                layerNames.forEach(layerName => {
-                    GeoPackageAPI.queryForGeoJSONFeatures(geoPackage, layerName)
-                    .then(geoJson => {
-                        if (!geoJson || geoJson.features.length === 0) {
-                            console.warn(`No features found in layer: ${layerName}`);
+                    try {
+                        const geoPackage = await GeoPackageAPI.open(arrayBuffer);
+                        const layerNames = await geoPackage.getFeatureTables();
+
+                        if (layerNames.length === 0) {
+                            alert("No vector layers found in the GeoPackage.");
                             return;
                         }
 
-                        // Convert MultiLineString to LineString
-                        geoJson.features = geoJson.features.map(feature => {
-                            if (feature.geometry.type === "MultiLineString") {
-                                return feature.geometry.coordinates.map(coords => ({
-                                    type: "Feature",
-                                    properties: feature.properties,
-                                    geometry: {
-                                        type: "LineString",
-                                        coordinates: coords
-                                    }
-                                }));
-                            }
-                            return feature;
-                        }).flat(); // Flatten array
+                        layerNames.forEach(async (layerName) => {
+                            const geoJson = await GeoPackageAPI.queryForGeoJSONFeatures(geoPackage, layerName);
 
-                        let gpkgLayer = L.geoJSON(geoJson, {
-                            style: { color: "blue", weight: 3 },
-                            onEachFeature: function (feature, layer) {
-                                if (feature.properties) {
-                                    let popupContent = "";
-                                    for (let key in feature.properties) {
-                                        popupContent += `<b>${key}</b>: ${feature.properties[key]}<br>`;
-                                    }
-                                    layer.bindPopup(popupContent);
+                            if (!geoJson || geoJson.features.length === 0) {
+                                console.warn(`No features found in layer: ${layerName}`);
+                                return;
+                            }
+
+                            // Convert MultiLineString & MultiPolygon to LineString & Polygon
+                            geoJson.features = geoJson.features.flatMap(feature => {
+                                if (feature.geometry.type === "MultiLineString") {
+                                    return feature.geometry.coordinates.map(coords => ({
+                                        type: "Feature",
+                                        properties: feature.properties,
+                                        geometry: { type: "LineString", coordinates: coords }
+                                    }));
+                                } else if (feature.geometry.type === "MultiPolygon") {
+                                    return feature.geometry.coordinates.map(coords => ({
+                                        type: "Feature",
+                                        properties: feature.properties,
+                                        geometry: { type: "Polygon", coordinates: coords }
+                                    }));
                                 }
-                            }
-                        }).addTo(map);
+                                return feature; // Return unchanged if not Multi*
+                            });
 
-                        map.fitBounds(gpkgLayer.getBounds());
-                    });
-                });
-            }).catch(error => {
-                console.error("Error loading GPKG:", error);
-                alert("Failed to load GeoPackage file.");
-            });
-        } else {
-            alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
+                            let gpkgLayer = L.geoJSON(geoJson, {
+                                style: getStyle,
+                                onEachFeature: function (feature, layer) {
+                                    if (feature.properties) {
+                                        let popupContent = "";
+                                        for (let key in feature.properties) {
+                                            popupContent += `<b>${key}</b>: ${feature.properties[key]}<br>`;
+                                        }
+                                        layer.bindPopup(popupContent);
+                                    }
+                                }
+                            }).addTo(map);
+
+                            map.fitBounds(gpkgLayer.getBounds());
+                        });
+
+                    } catch (error) {
+                        console.error("Error loading GPKG:", error);
+                        alert("Failed to load GeoPackage file.");
+                    }
+
+                } else {
+                    alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
         }
-    };
-
-    reader.readAsArrayBuffer(file);
-}
 
         // Event listeners for the upload buttons
         document.getElementById('uploadDesign').onclick = function() {
             const fileInput = document.getElementById('designFile');
             if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0], 'design');
+                handleFileUpload(fileInput.files[0]);
             } else {
                 alert('Please select a design file to upload.');
             }
@@ -137,7 +137,7 @@
         document.getElementById('uploadActual').onclick = function() {
             const fileInput = document.getElementById('actualFile');
             if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0], 'actual');
+                handleFileUpload(fileInput.files[0]);
             } else {
                 alert('Please select an actual file to upload.');
             }
