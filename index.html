@@ -53,15 +53,9 @@
                     const kmlLayer = new L.KML(data);
                     kmlLayer.addTo(map);
                 } else if (file.name.endsWith(".gpkg")) {
-                    // Parse GPKG
-                    const gpkgLayer = L.geoPackage(data);
-                    gpkgLayer.then(function(layers) {
-                        layers.forEach(function(layer) {
-                            layer.addTo(map); // Add each layer to the map
-                        });
-                    }).catch(function(error) {
-                        console.error("Error loading GPKG:", error);
-                    });
+                    // Parse GPKG using geoPackageTileLayer
+                    const gpkgLayer = L.geoPackageTileLayer(data);
+                    gpkgLayer.addTo(map);
                 } else {
                     alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
                 }
