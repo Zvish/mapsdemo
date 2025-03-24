@@ -3,84 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map with File Uploads and GeoPackage Support</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/@ngageoint/leaflet-geopackage@4.1.3/dist/leaflet-geopackage.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-kml@1.0.1/L.KML.js"></script>
-    <style>
-        #map { height: 600px; }
-        .upload-container {
-            margin: 10px 0;
-        }
-    </style>
+    <title>Leaflet GeoPackage Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage.min.js"></script>
+    <script src="https://unpkg.com/sql.js@1.6.2/dist/sql-wasm.js"></script>
 </head>
 <body>
-    <div id="map"></div>
-
-    <div class="upload-container">
-        <h3>Upload Layers</h3>
-        <label for="designFile">Upload Design Layer (GeoJSON, KML, GPKG):</label>
-        <input type="file" id="designFile" accept=".geojson,.kml,.gpkg" />
-        <br />
-        <label for="actualFile">Upload Actual Layer (GeoJSON, KML, GPKG):</label>
-        <input type="file" id="actualFile" accept=".geojson,.kml,.gpkg" />
-        <br />
-        <button id="uploadDesign">Add Design Layer</button>
-        <button id="uploadActual">Add Actual Layer</button>
-    </div>
+    <div id="map" style="width: 100%; height: 600px;"></div>
+    <input type="file" id="fileInput" accept=".gpkg" />
 
     <script>
-        // Initialize the map
         var map = L.map('map').setView([0, 0], 2);
 
-        // Add a tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Function to handle file uploads
-        function handleFileUpload(file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const data = event.target.result;
-
-                if (file.type === "application/json" || file.name.endsWith(".geojson")) {
-                    // Parse GeoJSON
-                    L.geoJSON(JSON.parse(data)).addTo(map);
-                } else if (file.type === "application/vnd.google-earth.kml+xml" || file.name.endsWith(".kml")) {
-                    // Parse KML
-                    const kmlLayer = new L.KML(data);
-                    kmlLayer.addTo(map);
-                } else if (file.name.endsWith(".gpkg")) {
-                    // Parse GPKG
-                    const gpkgLayer = L.geoPackageTileLayer(data); // Create a tile layer for the GPKG
-                    gpkgLayer.addTo(map); // Add the layer directly to the map
-                } else {
-                    alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
-                }
-            };
-            reader.readAsArrayBuffer(file); // Use readAsArrayBuffer for binary files
-        }
-
-        // Event listeners for the upload buttons
-        document.getElementById('uploadDesign').onclick = function() {
-            const fileInput = document.getElementById('designFile');
-            if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0]);
-            } else {
-                alert('Please select a design file to upload.');
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var arrayBuffer = e.target.result;
+                    initSqlJs().then(function(SQL) {
+                        var uInt8Array = new Uint8Array(arrayBuffer);
+                        var db = new SQL.Database(uInt8Array);
+                        var geoPackage = new GeoPackage.GeoPackageAPI(db);
+                        geoPackage.getFeatureTables().then(function(featureTables) {
+                            featureTables.forEach(function(table) {
+                                geoPackage.getGeoJSONFeaturesInTable(table).then(function(geojson) {
+                                    var layer = L.geoJSON(geojson, {
+                                        onEachFeature: function (feature, layer) {
+                                            if (feature.properties) {
+                                                layer.bindPopup(Object.keys(feature.properties).map(function(k) {
+                                                    return k + ": " + feature.properties[k];
+                                                }).join("<br />"), {
+                                                    maxHeight: 200
+                                                });
+                                            }
+                                        }
+                                    }).addTo(map);
+                                    map.fitBounds(layer.getBounds());
+                                });
+                            });
+                        });
+                    });
+                };
+                reader.readAsArrayBuffer(file);
             }
-        };
-
-        document.getElementById('uploadActual').onclick = function() {
-            const fileInput = document.getElementById('actualFile');
-            if (fileInput.files.length > 0) {
-                handleFileUpload(fileInput.files[0]);
-            } else {
-                alert('Please select an actual file to upload.');
-            }
-        };
+        });
     </script>
 </body>
 </html>
