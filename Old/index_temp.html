@@ -21,40 +21,42 @@
         }).addTo(map);
         
         document.getElementById('fileInput').addEventListener('change', function(event) {
-            var file = event.target.files[0];
-            if (file) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var arrayBuffer = e.target.result;
-                    initSqlJs({ 
-                        locateFile: filename => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm'
-                    }).then(function(SQL) {
-                        var uInt8Array = new Uint8Array(arrayBuffer);
-                        var db = new SQL.Database(uInt8Array);
-                        var geoPackage = new GeoPackage.GeoPackageAPI(db);
-                        geoPackage.getFeatureTables().then(function(featureTables) {
-                            featureTables.forEach(function(table) {
-                                geoPackage.getGeoJSONFeaturesInTable(table).then(function(geojson) {
-                                    var layer = L.geoJSON(geojson, {
-                                        onEachFeature: function (feature, layer) {
-                                            if (feature.properties) {
-                                                layer.bindPopup(Object.keys(feature.properties).map(function(k) {
-                                                    return k + ": " + feature.properties[k];
-                                                }).join("<br />"), {
-                                                    maxHeight: 200
-                                                });
-                                            }
+        var file = event.target.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var arrayBuffer = e.target.result;
+                initSqlJs({
+                    locateFile: filename => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.wasm'
+                }).then(function(SQL) {
+                    var uInt8Array = new Uint8Array(arrayBuffer);
+                    var db = new SQL.Database(uInt8Array);
+                    var geoPackage = new GeoPackage.GeoPackageAPI(db);
+                    geoPackage.getFeatureTables().then(function(featureTables) {
+                        featureTables.forEach(function(table) {
+                            geoPackage.getGeoJSONFeaturesInTable(table).then(function(geojson) {
+                                var layer = L.geoJSON(geojson, {
+                                    onEachFeature: function (feature, layer) {
+                                        if (feature.properties) {
+                                            layer.bindPopup(Object.keys(feature.properties).map(function(k) {
+                                                return k + ": " + feature.properties[k];
+                                            }).join("<br />"), {
+                                                maxHeight: 200
+                                            });
                                         }
-                                    }).addTo(map);
-                                    map.fitBounds(layer.getBounds());
-                                });
+                                    }
+                                }).addTo(map);
+                                map.fitBounds(layer.getBounds());
                             });
                         });
                     });
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        });
+                }).catch(error => {
+                    console.error("Error initializing SQL.js:", error);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    });
     </script>
 </body>
 </html>
