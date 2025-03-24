@@ -6,7 +6,8 @@
     <title>Leaflet GeoPackage Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-geopackage@2.0.5/dist/leaflet-geopackage.js"></script>
+    <script src="https://unpkg.com/@ngageoint/geopackage/dist/geopackage.min.js"></script>
+    <script src="https://unpkg.com/sql.js@1.6.2/dist/sql-wasm.js"></script>
 </head>
 <body>
     <div id="map" style="width: 100%; height: 600px;"></div>
@@ -25,10 +26,29 @@
                 var reader = new FileReader();
                 reader.onload = function(e) {
                     var arrayBuffer = e.target.result;
-                    L.geoPackageFeatureLayer([], {
-                        geoPackageUrl: URL.createObjectURL(file),
-                        layerName: undefined
-                    }).addTo(map);
+                    initSqlJs().then(function(SQL) {
+                        var uInt8Array = new Uint8Array(arrayBuffer);
+                        var db = new SQL.Database(uInt8Array);
+                        var geoPackage = new GeoPackage.GeoPackageAPI(db);
+                        geoPackage.getFeatureTables().then(function(featureTables) {
+                            featureTables.forEach(function(table) {
+                                geoPackage.getGeoJSONFeaturesInTable(table).then(function(geojson) {
+                                    var layer = L.geoJSON(geojson, {
+                                        onEachFeature: function (feature, layer) {
+                                            if (feature.properties) {
+                                                layer.bindPopup(Object.keys(feature.properties).map(function(k) {
+                                                    return k + ": " + feature.properties[k];
+                                                }).join("<br />"), {
+                                                    maxHeight: 200
+                                                });
+                                            }
+                                        }
+                                    }).addTo(map);
+                                    map.fitBounds(layer.getBounds());
+                                });
+                            });
+                        });
+                    });
                 };
                 reader.readAsArrayBuffer(file);
             }
