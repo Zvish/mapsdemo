@@ -1,1 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map with File Uploads and GeoPackage Support</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@ngageoint/leaflet-geopackage@4.1.3/dist/leaflet-geopackage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-kml@1.0.1/L.KML.js"></script>
+    <style>
+        #map { height: 600px; }
+        .upload-container {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
 
+    <div class="upload-container">
+        <h3>Upload Layers</h3>
+        <label for="designFile">Upload Design Layer (GeoJSON, KML, GPKG):</label>
+        <input type="file" id="designFile" accept=".geojson,.kml,.gpkg" />
+        <br />
+        <label for="actualFile">Upload Actual Layer (GeoJSON, KML, GPKG):</label>
+        <input type="file" id="actualFile" accept=".geojson,.kml,.gpkg" />
+        <br />
+        <button id="uploadDesign">Add Design Layer</button>
+        <button id="uploadActual">Add Actual Layer</button>
+    </div>
+
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([0, 0], 2);
+
+        // Add a tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Function to handle file uploads
+        function handleFileUpload(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = event.target.result;
+
+                if (file.type === "application/json" || file.name.endsWith(".geojson")) {
+                    // Parse GeoJSON
+                    L.geoJSON(JSON.parse(data)).addTo(map);
+                } else if (file.type === "application/vnd.google-earth.kml+xml" || file.name.endsWith(".kml")) {
+                    // Parse KML
+                    const kmlLayer = new L.KML(data);
+                    kmlLayer.addTo(map);
+                } else if (file.name.endsWith(".gpkg")) {
+                    // Parse GPKG
+                    const gpkgLayer = L.geoPackageTileLayer(data); // Create a tile layer for the GPKG
+                    gpkgLayer.addTo(map); // Add the layer directly to the map
+                } else {
+                    alert('Unsupported file type. Please upload a GeoJSON, KML, or GPKG file.');
+                }
+            };
+            reader.readAsArrayBuffer(file); // Use readAsArrayBuffer for binary files
+        }
+
+        // Event listeners for the upload buttons
+        document.getElementById('uploadDesign').onclick = function() {
+            const fileInput = document.getElementById('designFile');
+            if (fileInput.files.length > 0) {
+                handleFileUpload(fileInput.files[0]);
+            } else {
+                alert('Please select a design file to upload.');
+            }
+        };
+
+        document.getElementById('uploadActual').onclick = function() {
+            const fileInput = document.getElementById('actualFile');
+            if (fileInput.files.length > 0) {
+                handleFileUpload(fileInput.files[0]);
+            } else {
+                alert('Please select an actual file to upload.');
+            }
+        };
+    </script>
+</body>
+</html>
